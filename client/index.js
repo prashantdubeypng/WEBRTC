@@ -1,3 +1,6 @@
+// Load environment variables
+require('dotenv').config();
+
 const express = require('express')
 const path = require('path')
 const app = express()
@@ -53,7 +56,7 @@ const io = new Server(server, {
     cors: {
         origin: [
             'http://localhost:3000',
-            'https://your-frontend-name.vercel.app',  // Replace with your actual Vercel URL
+            'https://webrtc-orpin.vercel.app/',  // Replace with your actual Vercel URL
             process.env.FRONTEND_URL
         ].filter(Boolean),
         methods: ["GET", "POST"],
