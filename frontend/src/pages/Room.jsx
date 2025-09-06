@@ -9,6 +9,7 @@ const Roompage = ()=>{
     const [remoteEmailId , setremoteEmailId] = useState(null)
     const videoRef = useRef(null);
     const remoteVideoRef = useRef(null);
+    const mystreamRef = useRef(null); // Ref to track latest stream value
     const hadlenewUserjoined = useCallback( async(data)=>{
         const {emailId} =data;
         console.log('🔷 NEW USER JOINED:', emailId);
@@ -49,17 +50,33 @@ const Roompage = ()=>{
                 return;
             }
             
-            // Stream should already be added by useEffect, just create answer
+            // Stream should already be added by useEffect, wait for it if needed
             if (!mystream) {
-                console.log('⚠️ No stream available for response, retrying in 1 second...');
-                setTimeout(() => {
-                    if (mystream) {
-                        console.log('✅ Stream now available, retrying call handling');
-                        handleincomingcall(data); // Retry
+                console.log('⚠️ No stream available for response, waiting for stream...');
+                let retryCount = 0;
+                const maxRetries = 10; // 5 seconds total wait time
+                
+                const checkStreamInterval = setInterval(() => {
+                    retryCount++;
+                    const currentStream = mystreamRef.current; // Get current value from ref
+                    if (currentStream) {
+                        console.log(`✅ Stream now available after ${retryCount * 500}ms, handling call`);
+                        clearInterval(checkStreamInterval);
+                        // Call createAnswere directly instead of recursing
+                        createAnswere(offer).then(ans => {
+                            console.log('📤 Sending answer:', ans);
+                            socket.emit('call-accepted', { emailId: from, ans: { type: ans.type, sdp: ans.sdp } });
+                            setremoteEmailId(from);
+                        }).catch(err => {
+                            console.error('❌ Failed to create answer:', err);
+                        });
+                    } else if (retryCount >= maxRetries) {
+                        console.log('❌ Stream not available after 5 seconds, call failed');
+                        clearInterval(checkStreamInterval);
                     } else {
-                        console.log('❌ Stream still not available after retry');
+                        console.log(`🔄 Stream check ${retryCount}/${maxRetries}, waiting...`);
                     }
-                }, 1000);
+                }, 500);
                 return;
             }
             
@@ -126,6 +143,7 @@ const Roompage = ()=>{
             });
             console.log('Got user media stream');
             setMystream(stream);
+            mystreamRef.current = stream; // Update ref as well
         } catch (error) {
             console.error('Error accessing media devices:', error);
             // Try with just video if both fail
@@ -133,6 +151,7 @@ const Roompage = ()=>{
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 console.log('Got video-only stream');
                 setMystream(stream);
+                mystreamRef.current = stream; // Update ref as well
             } catch (videoError) {
                 console.error('Error accessing video:', videoError);
             }
