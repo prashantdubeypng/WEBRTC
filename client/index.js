@@ -6,21 +6,58 @@ const { Server } = require('socket.io')
 
 app.use(parser.json())
 
-// Serve static files from the React app build folder
-app.use(express.static(path.join(__dirname, '../frontend/build')))
+// CORS middleware for API endpoints
+app.use((req, res, next) => {
+    const allowedOrigins = [
+        'http://localhost:3000',
+        'https://your-frontend-name.vercel.app',  // Replace with your actual Vercel URL
+        process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+        return;
+    }
+    
+    next();
+});
 
-// Handle React routing, return all requests to React app
-app.use((req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/build/index.html'))
-})
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// API endpoint to get server info
+app.get('/api/info', (req, res) => {
+    res.json({ 
+        message: 'WebRTC Signaling Server', 
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
 
 const PORT = process.env.PORT || 9001;
 
-// Start both HTTP server and Socket.IO on the same port
+// Start HTTP server and Socket.IO
 const server = require('http').createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: [
+            'http://localhost:3000',
+            'https://your-frontend-name.vercel.app',  // Replace with your actual Vercel URL
+            process.env.FRONTEND_URL
+        ].filter(Boolean),
+        methods: ["GET", "POST"],
+        credentials: true
     },
 });
 

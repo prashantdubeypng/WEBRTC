@@ -12,10 +12,10 @@ export const useSocket = () => {
 // Provider component
 export const SocketProvider = ({ children }) => {
   const socket = useMemo(() => {
-    // Use same port in production, different port in development
+    // Use environment variable for backend URL in production, localhost in development
     const socketUrl = process.env.NODE_ENV === 'production' 
-      ? window.location.origin  // Same port as the server
-      : "http://localhost:9001"; // Different port in development
+      ? process.env.REACT_APP_BACKEND_URL || 'https://your-backend-name.onrender.com'  // Your Render backend URL
+      : "http://localhost:9001"; // Development backend
     
     return io(socketUrl, {
       transports: ["websocket"],
