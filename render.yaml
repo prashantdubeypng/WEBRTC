@@ -2,8 +2,9 @@ services:
   - type: web
     name: webrtc-backend
     env: node
-    buildCommand: cd client && npm install
-    startCommand: cd client && npm start
+    rootDir: client
+    buildCommand: npm install
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
