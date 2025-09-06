@@ -14,7 +14,7 @@ const Roompage = ()=>{
         console.log('🔷 NEW USER JOINED:', emailId);
         console.log('🔷 My stream available:', !!mystream);
         
-        // Ensure we have our stream before sending it
+        // Stream should already be added by useEffect, just create offer
         if (!mystream) {
             console.log('⚠️ No stream available yet, retrying in 1 second...');
             setTimeout(() => {
@@ -28,16 +28,13 @@ const Roompage = ()=>{
             return;
         }
         
-        // Send our stream first, then create offer
-        console.log('📹 Sending our stream to new user');
-        await sendstream(mystream);
-        
-        console.log('📞 Creating offer for new user');
+        // Stream is already added by useEffect, just create offer
+        console.log('� Creating offer for new user (stream already added)');
         const offer = await createoffer();
         console.log('📤 Sending offer:', offer);
         socket.emit('call-user', { emailId, offer: { type: offer.type, sdp: offer.sdp } });
         setremoteEmailId(emailId);
-    },[createoffer, socket, mystream, sendstream])
+    },[createoffer, socket, mystream])
     
     const handleincomingcall = useCallback(async(data)=>{
         try {
@@ -52,7 +49,7 @@ const Roompage = ()=>{
                 return;
             }
             
-            // Ensure we have our stream before responding
+            // Stream should already be added by useEffect, just create answer
             if (!mystream) {
                 console.log('⚠️ No stream available for response, retrying in 1 second...');
                 setTimeout(() => {
@@ -66,11 +63,8 @@ const Roompage = ()=>{
                 return;
             }
             
-            // Send our stream before creating answer
-            console.log('📹 Sending our stream in response to incoming call');
-            await sendstream(mystream);
-            
-            console.log('📞 Creating answer');
+            // Stream already added by useEffect, just create answer  
+            console.log('� Creating answer (stream already added)');
             const ans = await createAnswere(offer);
             console.log('📤 Sending answer:', ans);
             socket.emit('call-accepted', { emailId: from, ans: { type: ans.type, sdp: ans.sdp } });
@@ -78,7 +72,7 @@ const Roompage = ()=>{
         } catch (error) {
             console.error('❌ Error handling incoming call:', error);
         }
-    },[createAnswere, socket, mystream, sendstream])
+    },[createAnswere, socket, mystream])
     
     const handlecallaccepted = useCallback (async(data)=>{
         try {
@@ -161,19 +155,13 @@ const Roompage = ()=>{
         // Only run once on mount
     }, [getUserMediaStream]);
     
-    // Send stream when it becomes available and ensure bi-directional sharing
+    // Send stream when it becomes available - SINGLE POINT OF TRUTH
     useEffect(() => {
         if (mystream) {
-            console.log('📹 Stream available, adding to peer connection');
+            console.log('🎬 STREAM READY - Adding to peer connection (MAIN)');
             sendstream(mystream);
-            
-            // If we have a remote user connected, ensure they get our new stream
-            if (remoteEmailId) {
-                console.log('🔄 Re-sharing stream with connected remote user:', remoteEmailId);
-                // You might need to renegotiate here for the new stream
-            }
         }
-    }, [mystream, sendstream, remoteEmailId]);
+    }, [mystream, sendstream]);
 
     useEffect(() => {
         if (mystream && videoRef.current) {

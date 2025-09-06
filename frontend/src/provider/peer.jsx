@@ -33,7 +33,14 @@ export const PeerProvider = ({ children }) => {
       // Handle failed connections
       if (peerConnection.iceConnectionState === 'failed') {
         console.log('ICE connection failed, attempting restart...');
+        setStreamSent(false); // Reset stream state to allow re-sending
         peerConnection.restartIce();
+      }
+      
+      // Reset stream state on disconnection to allow reconnection
+      if (peerConnection.iceConnectionState === 'disconnected') {
+        console.log('ICE connection disconnected, resetting stream state...');
+        setStreamSent(false);
       }
     };
     
@@ -67,6 +74,7 @@ export const PeerProvider = ({ children }) => {
     return peerConnection;
   }, []);
   
+  const [streamSent, setStreamSent] = useState(false);
   const [remoteStream, setremoteStream] = useState(null);
   const createoffer = async () => {
     const offer = await peer.createOffer();
@@ -116,19 +124,36 @@ export const PeerProvider = ({ children }) => {
     }
   }
   const sendstream = async(stream) => {
-    console.log('Adding stream to peer connection');
+    console.log('🎵 SENDSTREAM called - checking for duplicates...');
+    
+    if (streamSent) {
+      console.log('⚠️ Stream already sent, skipping duplicate call');
+      return;
+    }
+    
+    console.log('📤 Adding stream to peer connection');
     const tracks = stream.getTracks();
+    let tracksAdded = 0;
+    
     for(const track of tracks) {
       // Check if track is already added to avoid duplicates
       const senders = peer.getSenders();
       const existingSender = senders.find(sender => sender.track === track);
       
       if (!existingSender) {
-        console.log('Adding track:', track.kind);
+        console.log('✅ Adding NEW track:', track.kind);
         peer.addTrack(track, stream);
+        tracksAdded++;
       } else {
-        console.log('Track already added:', track.kind);
+        console.log('⚠️ Track already exists:', track.kind);
       }
+    }
+    
+    if (tracksAdded > 0) {
+      setStreamSent(true);
+      console.log('✅ Stream sending complete. Tracks added:', tracksAdded);
+    } else {
+      console.log('⚠️ No new tracks were added');
     }
   };
   const handletrackevent = useCallback((ev) => {
