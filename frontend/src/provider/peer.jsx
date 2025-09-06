@@ -14,17 +14,54 @@ export const PeerProvider = ({ children }) => {
     const peerConnection = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // OpenRelay Project STUN servers (more reliable)
+        { urls: 'stun:openrelay.metered.ca:80' },
+        // Alternative public STUN servers
+        { urls: 'stun:stun.relay.metered.ca:80' }
+      ],
+      iceCandidatePoolSize: 10  // Generate more ICE candidates
     });
     
     // Log ICE connection state changes
     peerConnection.oniceconnectionstatechange = () => {
       console.log('ICE connection state:', peerConnection.iceConnectionState);
+      
+      // Handle failed connections
+      if (peerConnection.iceConnectionState === 'failed') {
+        console.log('ICE connection failed, attempting restart...');
+        peerConnection.restartIce();
+      }
     };
     
     peerConnection.onconnectionstatechange = () => {
       console.log('Connection state:', peerConnection.connectionState);
+    };
+    
+    // Add ontrack event handler directly to peer connection
+    peerConnection.ontrack = (event) => {
+      console.log('🎥 Track event received:', event);
+      console.log('Event streams:', event.streams);
+      console.log('Event track:', event.track);
+      
+      if (event.streams && event.streams[0]) {
+        console.log('✅ Setting remote stream from ontrack');
+        // We'll handle this through the callback system
+      } else {
+        console.log('❌ No streams in track event');
+      }
+    };
+    
+    // Add more detailed ICE candidate logging
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log('🧊 New ICE candidate:', event.candidate.type, event.candidate.protocol);
+      } else {
+        console.log('🧊 All ICE candidates have been sent');
+      }
     };
     
     return peerConnection;
@@ -95,13 +132,21 @@ export const PeerProvider = ({ children }) => {
     }
   };
   const handletrackevent = useCallback((ev) => {
-    console.log('Track event received:', ev);
+    console.log('🎥 Track event received in handler:', ev);
+    console.log('Event streams:', ev.streams);
+    console.log('Event track kind:', ev.track?.kind);
+    
     const streams = ev.streams;
     if (streams && streams[0]) {
-      console.log('Setting remote stream');
+      console.log('✅ Setting remote stream:', streams[0]);
+      console.log('Stream tracks:', streams[0].getTracks().map(t => t.kind));
       setremoteStream(streams[0]);
     } else {
-      console.log('No streams in track event');
+      console.log('❌ No streams in track event, creating new stream');
+      // If no stream is provided, create one with the track
+      const newStream = new MediaStream([ev.track]);
+      console.log('✅ Created new stream with track:', newStream);
+      setremoteStream(newStream);
     }
   }, []);
         
