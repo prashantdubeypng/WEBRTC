@@ -11,15 +11,30 @@ const Roompage = ()=>{
     const remoteVideoRef = useRef(null);
     const hadlenewUserjoined = useCallback( async(data)=>{
         const {emailId} =data;
-        console.log('new user joined:', emailId);
+        console.log('🔷 NEW USER JOINED:', emailId);
+        console.log('🔷 My stream available:', !!mystream);
         
-        // Send our stream first, then create offer
-        if (mystream) {
-            console.log('Sending our stream to new user');
-            sendstream(mystream);
+        // Ensure we have our stream before sending it
+        if (!mystream) {
+            console.log('⚠️ No stream available yet, retrying in 1 second...');
+            setTimeout(() => {
+                if (mystream) {
+                    console.log('✅ Stream now available, retrying connection to', emailId);
+                    hadlenewUserjoined(data); // Retry
+                } else {
+                    console.log('❌ Stream still not available after retry');
+                }
+            }, 1000);
+            return;
         }
         
+        // Send our stream first, then create offer
+        console.log('📹 Sending our stream to new user');
+        await sendstream(mystream);
+        
+        console.log('📞 Creating offer for new user');
         const offer = await createoffer();
+        console.log('📤 Sending offer:', offer);
         socket.emit('call-user', { emailId, offer: { type: offer.type, sdp: offer.sdp } });
         setremoteEmailId(emailId);
     },[createoffer, socket, mystream, sendstream])
@@ -27,26 +42,41 @@ const Roompage = ()=>{
     const handleincomingcall = useCallback(async(data)=>{
         try {
             const { from, offer } = data;
-            console.log('incoming call from', from);
-            console.log('Received offer:', offer);
+            console.log('🔵 INCOMING CALL from:', from);
+            console.log('🔵 My stream available:', !!mystream);
+            console.log('🔵 Received offer:', offer);
             
             // Validate offer data
             if (!offer || !offer.type || !offer.sdp) {
-                console.error('Invalid offer received:', offer);
+                console.error('❌ Invalid offer received:', offer);
+                return;
+            }
+            
+            // Ensure we have our stream before responding
+            if (!mystream) {
+                console.log('⚠️ No stream available for response, retrying in 1 second...');
+                setTimeout(() => {
+                    if (mystream) {
+                        console.log('✅ Stream now available, retrying call handling');
+                        handleincomingcall(data); // Retry
+                    } else {
+                        console.log('❌ Stream still not available after retry');
+                    }
+                }, 1000);
                 return;
             }
             
             // Send our stream before creating answer
-            if (mystream) {
-                console.log('Sending our stream in response to incoming call');
-                sendstream(mystream);
-            }
+            console.log('📹 Sending our stream in response to incoming call');
+            await sendstream(mystream);
             
+            console.log('📞 Creating answer');
             const ans = await createAnswere(offer);
+            console.log('📤 Sending answer:', ans);
             socket.emit('call-accepted', { emailId: from, ans: { type: ans.type, sdp: ans.sdp } });
             setremoteEmailId(from);
         } catch (error) {
-            console.error('Error handling incoming call:', error);
+            console.error('❌ Error handling incoming call:', error);
         }
     },[createAnswere, socket, mystream, sendstream])
     
@@ -131,13 +161,19 @@ const Roompage = ()=>{
         // Only run once on mount
     }, [getUserMediaStream]);
     
-    // Send stream when it becomes available
+    // Send stream when it becomes available and ensure bi-directional sharing
     useEffect(() => {
         if (mystream) {
-            console.log('Stream available, adding to peer connection');
+            console.log('📹 Stream available, adding to peer connection');
             sendstream(mystream);
+            
+            // If we have a remote user connected, ensure they get our new stream
+            if (remoteEmailId) {
+                console.log('🔄 Re-sharing stream with connected remote user:', remoteEmailId);
+                // You might need to renegotiate here for the new stream
+            }
         }
-    }, [mystream, sendstream]);
+    }, [mystream, sendstream, remoteEmailId]);
 
     useEffect(() => {
         if (mystream && videoRef.current) {

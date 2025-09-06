@@ -1,6 +1,7 @@
 import React , {useState,useEffect} from 'react'
 import {useNavigate} from 'react-router-dom'
-import {useSocket} from '../provider/socket'
+import { useSocket } from '../provider/socket';
+import { SessionManager } from '../utils/sessionManager';
 const Homepage =()=>{
     const socket = useSocket();
     const [email,setEmail] = useState('');
@@ -13,8 +14,20 @@ const Homepage =()=>{
         socket.on('joined-room', handlejoinedroom);
         return () => socket.off('joined-room', handlejoinedroom);
     }, [socket]);
-    const handlejoinroom =()=>{
-        socket.emit('join-room',{emailId:email , RoomId:RoomId});
+    const handlejoinroom = () => {
+        if (!email || !RoomId) {
+            alert('Please enter both email and room ID');
+            return;
+        }
+        
+        console.log('Joining room with session persistence...');
+        // Use session-based room joining
+        if (socket.joinRoomWithSession) {
+            socket.joinRoomWithSession(email, RoomId);
+        } else {
+            // Fallback to regular join
+            socket.emit('join-room', {emailId: email, RoomId: RoomId});
+        }
     }
 return(
     <div className = 'homepage-conatiner'>
